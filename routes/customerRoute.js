@@ -16,50 +16,64 @@ const router = express.Router();
  */
 router.get("/stats", adminAuth, async (req, res) => {
   try {
-    // Overall stats
-    const totalCustomers = await Customer.countDocuments();
-    const approvedCount = await Customer.countDocuments({ status: "approved" });
-    const pendingCount = await Customer.countDocuments({ status: "pending" });
-    const rejectedCount = await Customer.countDocuments({ status: "rejected" });
-    const totalLoanAmount = await Customer.aggregate([
-      { $group: { _id: null, total: { $sum: "$loanamount" } } }
-    ]);
-    // Monthwise stats (current year)
+    // Single optimized aggregation query for overall stats
     const currentYear = new Date().getFullYear();
-    const monthwise = await Customer.aggregate([
-      {
-        $match: {
-          createdAt: {
-            $gte: new Date(currentYear, 0, 1),
-            $lte: new Date(currentYear, 11, 31, 23, 59, 59, 999)
+    
+    const [overallStats, monthwiseStats] = await Promise.all([
+      // Overall stats in single query
+      Customer.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalCustomers: { $sum: 1 },
+            approvedCount: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } },
+            pendingCount: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+            rejectedCount: { $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] } },
+            totalLoanAmount: { $sum: "$loanamount" }
           }
         }
-      },
-      {
-        $group: {
-          _id: { month: { $month: "$createdAt" } },
-          approved: {
-            $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] }
-          },
-          pending: {
-            $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] }
-          },
-          rejected: {
-            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] }
-          },
-          loanTotal: { $sum: "$loanamount" },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id.month": 1 } }
+      ]),
+      // Monthwise stats for current year
+      Customer.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: new Date(currentYear, 0, 1),
+              $lte: new Date(currentYear, 11, 31, 23, 59, 59, 999)
+            }
+          }
+        },
+        {
+          $group: {
+            _id: { month: { $month: "$createdAt" } },
+            approved: {
+              $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] }
+            },
+            pending: {
+              $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] }
+            },
+            rejected: {
+              $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] }
+            },
+            loanTotal: { $sum: "$loanamount" },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { "_id.month": 1 } }
+      ])
     ]);
+
+    const stats = overallStats[0] || {
+      totalCustomers: 0,
+      approvedCount: 0,
+      pendingCount: 0,
+      rejectedCount: 0,
+      totalLoanAmount: 0
+    };
+
     res.json({
-      totalCustomers,
-      approvedCount,
-      pendingCount,
-      rejectedCount,
-      totalLoanAmount: totalLoanAmount[0]?.total || 0,
-      monthwise
+      ...stats,
+      monthwise: monthwiseStats
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
@@ -186,12 +200,41 @@ router.get("/profile", async (req, res) => {
 
 /**
  * @route GET /api/customers/all
- * @desc Get all customers (Admin only)
+ * @desc Get all customers with pagination (Admin only)
  */
 router.get("/all", adminAuth, async (req, res) => {
   try {
-    const customers = await Customer.find();
-    res.status(200).json(customers);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    const sortBy = req.query.sortBy || 'createdAt';
+    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder;
+
+    // Execute queries in parallel for better performance
+    const [customers, total] = await Promise.all([
+      Customer.find()
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(), // Use lean() for better performance
+      Customer.countDocuments()
+    ]);
+
+    res.status(200).json({
+      customers,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }

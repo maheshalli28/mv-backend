@@ -16,7 +16,18 @@ const CustomerSchema = new mongoose.Schema({
       default: "pending",
     },
     date:{type:Date, default:Date.now}
-}, { timestamps: true });
+}, { 
+    timestamps: true,
+    // Add indexes for faster queries
+    indexes: [
+        { email: 1, phone: 1 }, // For profile lookup (email + phone)
+        { status: 1 }, // For filtering by status
+        { createdAt: 1 }, // For date filtering and sorting
+        { loantype: 1 }, // For loan type filtering
+        { loanamount: 1 }, // For amount range filtering
+        { firstname: "text", lastname: "text", email: "text" } // For text search
+    ]
+});
 
 const Customer = mongoose.model("Customer",CustomerSchema);
 export default Customer
