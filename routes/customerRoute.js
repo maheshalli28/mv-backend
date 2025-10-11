@@ -82,7 +82,7 @@ router.get("/stats", adminAuth, async (req, res) => {
 
 /**
  * @route POST /api/customers/register
- * @desc Register a new customer
+ * @desc Register a new customer (optimized)
  */
 router.post("/register", async (req, res) => {
   try {
@@ -99,20 +99,23 @@ router.post("/register", async (req, res) => {
       loanamount,
     } = req.body;
 
-    if (!email || !phone) {
+    // Validate inputs
+    if (!firstname || !email || !phone) {
       return res
         .status(400)
-        .json({ message: "Name, Email and Phone are required" });
+        .json({ message: "Firstname, Email, and Phone are required" });
     }
 
-    const existing = await Customer.findOne({ email, phone });
+    // Check if email or phone already exists
+    const existing = await Customer.findOne({ $or: [{ email }, { phone }] });
     if (existing) {
-      return res
-        .status(400)
-        .json({ message: "Customer already registered" });
+      return res.status(400).json({
+        message: "Customer already exists with this email or phone number",
+      });
     }
 
-    const customer = new Customer({
+    // Create new customer
+    const customer = await Customer.create({
       firstname,
       lastname,
       gender,
@@ -125,52 +128,66 @@ router.post("/register", async (req, res) => {
       loanamount,
     });
 
-    await customer.save();
-
-    // Send registration email
-    await sendEmail(
-      email,
-      "Welcome to MV Associates - Registration Successful",
-     `
-      <td style="font-family: Arial, sans-serif; padding: 15px; background-color: #f9f9f9; border: 1px solid #dddddd;">
-      <p style="font-size: 16px; color: #333333;">
-       Dear <strong>${firstname} ${lastname},</strong>,
-      </p>
-      <p style="font-size: 16px; color: #333333;">Thank you for registering at MV Associates. We have received your details and will process your loan application shortly.</p>
-      <p style="font-size: 16px; color: #333333;"> Email: <strong>${email}</strong></p>
-      <p style="font-size: 16px; color: #333333;"> Phone: <strong>${phone}</strong></p>
-      <a style="font-size: 16px; color: #1976d2;" href="https://mvassociates.org/login">Login Here</a>
-
-      <p style="font-size: 16px; color: #333333;">
-      If you have any questions or concerns, feel free to reach out to us using the contact information below.
-      </p>
-
-      <hr style="border: none; border-top: 1px solid #eeeeee; margin: 20px 0;">
-
-      <p style="font-size: 14px; color: #555555;">
-      🌐 Website: <a href="https://www.mvassociates.org" style="color: #1976d2;">www.mvassociates.org</a><br>
-      📧 Email: <a href="mailto:mvassociates.org@gmail.com" style="color: #1976d2;">mvassociates.org@gmail.com</a><br>
-      📞 Phone: +91 8247675651
-      </p>
-
-      <p style="font-size: 14px; color: #555555;">
-      Thank you for choosing <strong>MV Associates </strong>. We appreciate your trust in our services.
-      </p>
-
-      <p style="font-size: 14px; color: #999999;">
-      &copy; 2025 MV Associates. All rights reserved.
-      </p>
-      </td>`
-    );
-
+    // ✅ Respond immediately (non-blocking)
     res.status(201).json({
       message: "Customer registered successfully",
       customer,
     });
+
+    // ⚙️ Background tasks (non-blocking)
+    setImmediate(async () => {
+      try {
+        // 1️⃣ Send welcome email
+        const emailTemplate = `
+        <td style="font-family: Arial, sans-serif; padding: 15px; background-color: #f9f9f9; border: 1px solid #dddddd;">
+          <p style="font-size: 16px; color: #333333;">
+            Dear <strong>${firstname} ${lastname},</strong>,
+          </p>
+          <p style="font-size: 16px; color: #333333;">Thank you for registering at MV Associates. We have received your details and will process your loan application shortly.</p>
+          <p style="font-size: 16px; color: #333333;">Email: <strong>${email}</strong></p>
+          <p style="font-size: 16px; color: #333333;">Phone: <strong>${phone}</strong></p>
+          <a style="font-size: 16px; color: #1976d2;" href="https://mvassociates.org/login">Login Here</a>
+
+          <p style="font-size: 16px; color: #333333;">If you have any questions or concerns, feel free to reach out to us using the contact information below.</p>
+
+          <hr style="border: none; border-top: 1px solid #eeeeee; margin: 20px 0;">
+
+          <p style="font-size: 14px; color: #555555;">
+            🌐 Website: <a href="https://www.mvassociates.org" style="color: #1976d2;">www.mvassociates.org</a><br>
+            📧 Email: <a href="mailto:mvassociates.org@gmail.com" style="color: #1976d2;">mvassociates.org@gmail.com</a><br>
+            📞 Phone: +91 8247675651
+          </p>
+
+          <p style="font-size: 14px; color: #555555;">
+            Thank you for choosing <strong>MV Associates</strong>. We appreciate your trust in our services.
+          </p>
+
+          <p style="font-size: 14px; color: #999999;">&copy; 2025 MV Associates. All rights reserved.</p>
+        </td>`;
+
+        await sendEmail(
+          email,
+          "Welcome to MV Associates - Registration Successful",
+          emailTemplate
+        );
+
+        // 2️⃣ Emit socket event (if Socket.io is set)
+        if (req.io) {
+          process.nextTick(() => {
+            req.io.emit("newCustomer", customer);
+          });
+        }
+      } catch (bgError) {
+        console.error("Background task error:", bgError.message);
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    console.error("❌ Registration error:", error);
+    res.status(500).json({ message: "Invalid registration", error: error.message });
   }
 });
+
+
 
 /**
  * @route GET /api/customers/profile
