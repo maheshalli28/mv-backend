@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 5001;
 // ✅ Create HTTP server and attach Socket.io
 const server = http.createServer(app);
 // Read allowed frontend origin from env, default to your Netlify site
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://mvassociates.netlify.app";
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://mvassociates.netlify.app" || "http://localhost:3000";
 const io = new Server(server, {
   cors: {
     origin: FRONTEND_URL,
