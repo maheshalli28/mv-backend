@@ -18,16 +18,25 @@ const PORT = process.env.PORT || 5001;
 
 // ✅ Create HTTP server and attach Socket.io
 const server = http.createServer(app);
+// Read allowed frontend origin from env, default to your Netlify site
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://mvassociates.netlify.app";
 const io = new Server(server, {
   cors: {
-    origin: "*", // or use your frontend domain, e.g. "https://mvassociates.org"
+    origin: FRONTEND_URL,
     methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
   },
 });
 
 // Middleware
 app.use(compression()); // Compress responses
-app.use(cors());
+// Make Express CORS settings match socket.io settings
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(express.json());
 
 // ✅ Attach io to every request (for real-time events)
