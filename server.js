@@ -17,12 +17,25 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // ✅ Create HTTP server and attach Socket.io
-const server = http.createServer(app);
-// Read allowed frontend origin from env, default to your Netlify site
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://mvassociates.netlify.app" || "http://mvassociates.org" || "http://localhost:3000";
+const server = http.createServer(app);git
+// Build an allowlist for trusted frontend origins. Prefer FRONTEND_URL env var (set this to https://mvassociates.org)
+const ALLOWED_ORIGINS = new Set([
+  process.env.FRONTEND_URL,
+  "https://mvassociates.org",
+  "https://mvassociates.netlify.app",
+  "http://localhost:3000",
+].filter(Boolean));
+
+// origin checker: allow requests with no origin (server-to-server), or those in the allowlist
+const originChecker = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (ALLOWED_ORIGINS.has(origin)) return callback(null, true);
+  return callback(new Error("CORS origin denied"), false);
+};
+
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_URL,
+    origin: (origin, cb) => originChecker(origin, cb),
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -32,8 +45,9 @@ const io = new Server(server, {
 // Middleware
 app.use(compression()); // Compress responses
 // Make Express CORS settings match socket.io settings
+// Make Express CORS settings match socket.io settings
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: originChecker,
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
