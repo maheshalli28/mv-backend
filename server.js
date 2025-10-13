@@ -17,7 +17,7 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // ✅ Create HTTP server and attach Socket.io
-const server = http.createServer(app);git
+const server = http.createServer(app);
 // Build an allowlist for trusted frontend origins. Prefer FRONTEND_URL env var (set this to https://mvassociates.org)
 const ALLOWED_ORIGINS = new Set([
   process.env.FRONTEND_URL,
