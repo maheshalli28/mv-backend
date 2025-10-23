@@ -102,10 +102,10 @@ router.post("/register", async (req, res) => {
     } = req.body;
 
     // Validate inputs
-    if (!firstname || !email || !phone || !accountnumber || !ifsc) {
+    if (!firstname || !email || !phone || !accountnumber || !ifsccode) {
       return res
         .status(400)
-        .json({ message: "Firstname, Email, Phone, Account Number, and IFSC are required" });
+        .json({ message: "Firstname, Email, Phone, Account Number, and IFSC Code are required" });
     }
 
     // Check if email or phone already exists
