@@ -95,15 +95,17 @@ router.post("/register", async (req, res) => {
       phone,
       address,
       bankname,
+      accountnumber,
+      ifsc,
       loantype,
       loanamount,
     } = req.body;
 
     // Validate inputs
-    if (!firstname || !email || !phone) {
+    if (!firstname || !email || !phone || !accountnumber || !ifsc) {
       return res
         .status(400)
-        .json({ message: "Firstname, Email, and Phone are required" });
+        .json({ message: "Firstname, Email, Phone, Account Number, and IFSC are required" });
     }
 
     // Check if email or phone already exists
@@ -124,6 +126,8 @@ router.post("/register", async (req, res) => {
       phone,
       address,
       bankname,
+      accountnumber,
+      ifsc,
       loantype,
       loanamount,
     });

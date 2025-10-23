@@ -9,6 +9,8 @@ const CustomerSchema = new mongoose.Schema({
     phone:{type:String, required:true},
     loantype:{type:String, default:"Home Loan"},
     bankname:{type:String, required:true},
+    accountnumber:{type:String, required:true},
+    ifsc:{type:String, required:true},
     loanamount:{type:Number, required:true},
     status: {
       type: String,
