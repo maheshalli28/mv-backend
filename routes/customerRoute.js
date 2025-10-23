@@ -96,7 +96,7 @@ router.post("/register", async (req, res) => {
       address,
       bankname,
       accountnumber,
-      ifsc,
+      ifsccode,
       loantype,
       loanamount,
     } = req.body;
@@ -127,7 +127,7 @@ router.post("/register", async (req, res) => {
       address,
       bankname,
       accountnumber,
-      ifsc,
+      ifsccode,
       loantype,
       loanamount,
     });
