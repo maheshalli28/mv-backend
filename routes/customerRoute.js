@@ -18,7 +18,7 @@ router.get("/stats", adminAuth, async (req, res) => {
   try {
     // Single optimized aggregation query for overall stats
     const currentYear = new Date().getFullYear();
-    
+
     const [overallStats, monthwiseStats] = await Promise.all([
       // Overall stats in single query
       Customer.aggregate([
@@ -273,6 +273,11 @@ router.put("/update/:id", adminAuth, async (req, res) => {
     const existingCustomer = await Customer.findById(id);
     if (!existingCustomer) {
       return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // Clear rejection message if status is not rejected
+    if (updates.status && updates.status !== "rejected") {
+      updates.rejectionMessage = "";
     }
 
     const updatedCustomer = await Customer.findByIdAndUpdate(id, updates, {
